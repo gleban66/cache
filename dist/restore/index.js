@@ -6607,6 +6607,7 @@ const cacheTwirpClient = __importStar(__nccwpck_require__(5938));
 const config_1 = __nccwpck_require__(8924);
 const tar_1 = __nccwpck_require__(2043);
 const constants_1 = __nccwpck_require__(8109);
+const http_client_1 = __nccwpck_require__(944);
 class ValidationError extends Error {
     constructor(message) {
         super(message);
@@ -6643,7 +6644,17 @@ function checkKey(key) {
  * @returns boolean return true if Actions cache service feature is available, otherwise false
  */
 function isFeatureAvailable() {
-    return !!process.env['ACTIONS_CACHE_URL'];
+    const cacheServiceVersion = (0, config_1.getCacheServiceVersion)();
+    // Check availability based on cache service version
+    switch (cacheServiceVersion) {
+        case 'v2':
+            // For v2, we need ACTIONS_RESULTS_URL
+            return !!process.env['ACTIONS_RESULTS_URL'];
+        case 'v1':
+        default:
+            // For v1, we only need ACTIONS_CACHE_URL
+            return !!process.env['ACTIONS_CACHE_URL'];
+    }
 }
 exports.isFeatureAvailable = isFeatureAvailable;
 /**
@@ -6728,8 +6739,16 @@ function restoreCacheV1(paths, primaryKey, restoreKeys, options, enableCrossOsAr
                 throw error;
             }
             else {
-                // Supress all non-validation cache related errors because caching should be optional
-                core.warning(`Failed to restore: ${error.message}`);
+                // warn on cache restore failure and continue build
+                // Log server errors (5xx) as errors, all other errors as warnings
+                if (typedError instanceof http_client_1.HttpClientError &&
+                    typeof typedError.statusCode === 'number' &&
+                    typedError.statusCode >= 500) {
+                    core.error(`Failed to restore: ${error.message}`);
+                }
+                else {
+                    core.warning(`Failed to restore: ${error.message}`);
+                }
             }
         }
         finally {
@@ -6807,7 +6826,15 @@ function restoreCacheV2(paths, primaryKey, restoreKeys, options, enableCrossOsAr
             }
             else {
                 // Supress all non-validation cache related errors because caching should be optional
-                core.warning(`Failed to restore: ${error.message}`);
+                // Log server errors (5xx) as errors, all other errors as warnings
+                if (typedError instanceof http_client_1.HttpClientError &&
+                    typeof typedError.statusCode === 'number' &&
+                    typedError.statusCode >= 500) {
+                    core.error(`Failed to restore: ${error.message}`);
+                }
+                else {
+                    core.warning(`Failed to restore: ${error.message}`);
+                }
             }
         }
         finally {
@@ -6910,7 +6937,15 @@ function saveCacheV1(paths, key, options, enableCrossOsArchive = false) {
                 core.info(`Failed to save: ${typedError.message}`);
             }
             else {
-                core.warning(`Failed to save: ${typedError.message}`);
+                // Log server errors (5xx) as errors, all other errors as warnings
+                if (typedError instanceof http_client_1.HttpClientError &&
+                    typeof typedError.statusCode === 'number' &&
+                    typedError.statusCode >= 500) {
+                    core.error(`Failed to save: ${typedError.message}`);
+                }
+                else {
+                    core.warning(`Failed to save: ${typedError.message}`);
+                }
             }
         }
         finally {
@@ -7006,7 +7041,15 @@ function saveCacheV2(paths, key, options, enableCrossOsArchive = false) {
                 core.info(`Failed to save: ${typedError.message}`);
             }
             else {
-                core.warning(`Failed to save: ${typedError.message}`);
+                // Log server errors (5xx) as errors, all other errors as warnings
+                if (typedError instanceof http_client_1.HttpClientError &&
+                    typeof typedError.statusCode === 'number' &&
+                    typedError.statusCode >= 500) {
+                    core.error(`Failed to save: ${typedError.message}`);
+                }
+                else {
+                    core.warning(`Failed to save: ${typedError.message}`);
+                }
             }
         }
         finally {
